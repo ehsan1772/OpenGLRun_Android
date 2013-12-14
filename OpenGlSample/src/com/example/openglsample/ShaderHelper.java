@@ -26,15 +26,17 @@ public class ShaderHelper {
 		
 		//compiling the shader
 		glCompileShader(shaderObjectId);
-
 		
-		// Print the shader info log to the Android log output.
-		Log.v(TAG, "Results of compiling source:" + "\n" + shaderCode + "\n:"
-		        + glGetShaderInfoLog(shaderObjectId));
-		
-		//checking to see if the compile was successful, the results gets written on the 0 index of the passed array
 		final int[] compileStatus = new int[1];
 		glGetShaderiv(shaderObjectId, GL_COMPILE_STATUS, compileStatus, 0);
+
+		String shaderInfo = glGetShaderInfoLog(shaderObjectId);
+		// Print the shader info log to the Android log output.
+		Log.v(TAG, "Results of compiling source:" + "\n" + shaderCode + "\n:"
+		        + shaderInfo);
+		
+		//checking to see if the compile was successful, the results gets written on the 0 index of the passed array
+
 		
 		if (compileStatus[0] == 0) {
 			glDeleteShader(shaderObjectId);
@@ -56,6 +58,9 @@ public class ShaderHelper {
 		//attaching our shaders to the program
 		glAttachShader(programObjectId, vertexShaderId);
 		glAttachShader(programObjectId, fragmentShaderId);
+		
+	       // Link the two shaders together into a program.
+        glLinkProgram(programObjectId);
 		
 		//checking to see if the attach was successful, the results gets written on the 0 index of the passed array
 		final int[] linkStatus = new int[1]; 

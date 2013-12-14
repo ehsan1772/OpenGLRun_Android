@@ -1,4 +1,28 @@
+/***
+ * Excerpted from "OpenGL ES for Android",
+ * published by The Pragmatic Bookshelf.
+ * Copyrights apply to this code. It may not be used to create training material, 
+ * courses, books, articles, and the like. Contact us if you are in doubt.
+ * We make no guarantees that this code is fit for any purpose. 
+ * Visit http://www.pragmaticprogrammer.com/titles/kbogla for more book information.
+***/
 package com.example.openglsample;
+
+import static android.opengl.GLES20.GL_COLOR_BUFFER_BIT;
+import static android.opengl.GLES20.GL_FLOAT;
+import static android.opengl.GLES20.GL_LINES;
+import static android.opengl.GLES20.GL_POINTS;
+import static android.opengl.GLES20.GL_TRIANGLES;
+import static android.opengl.GLES20.glClear;
+import static android.opengl.GLES20.glClearColor;
+import static android.opengl.GLES20.glDrawArrays;
+import static android.opengl.GLES20.glEnableVertexAttribArray;
+import static android.opengl.GLES20.glGetAttribLocation;
+import static android.opengl.GLES20.glGetUniformLocation;
+import static android.opengl.GLES20.glUniform4f;
+import static android.opengl.GLES20.glUseProgram;
+import static android.opengl.GLES20.glVertexAttribPointer;
+import static android.opengl.GLES20.glViewport;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -8,108 +32,169 @@ import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
 import util.TextResourceReader;
-
 import android.content.Context;
-import android.opengl.GLSurfaceView;
+import android.opengl.GLSurfaceView.Renderer;
 
-import static android.opengl.GLES20.*;
+public class AirHockeyRenderer implements Renderer {
+    private static final String U_COLOR = "u_Color";
+    private static final String A_POSITION = "a_Position";    
+    private static final int POSITION_COMPONENT_COUNT = 2;
+    private static final int BYTES_PER_FLOAT = 4;
+    private final FloatBuffer vertexData;
+    private final Context context;
+    private int program;
+    private int uColorLocation;
+    private int aPositionLocation;
 
-public class AirHockeyRenderer implements GLSurfaceView.Renderer {
-	private static final int BYTES_PER_FLOAT = 4;
-	private final FloatBuffer vertexData;
-	private static final int POSITION_COMPONENT_COUNT = 2;
-	private int program;
-	
-	private static final String U_COLOR = "u_Color"; 
-	private int uColorLocation;
-	
-	private static final String A_POSITION = "a_Position"; 
-	private int aPositionLocation;
+    public AirHockeyRenderer() {
+        // This constructor shouldn't be called -- only kept for showing
+        // evolution of the code in the chapter.
+        context = null;
+        vertexData = null;
+    }
 
-	float[] tableVertices = { 0f, 0f, 0f, 14f, 9f, 14f, 9f, 0f };
-
-	float[] tableVerticesWithTriangles = { 
-			//triangle 1
-			0f, 0f, 
+    public AirHockeyRenderer(Context context) {
+        this.context = context;
+        
+        /*
+		float[] tableVertices = { 
+			0f,  0f, 
+			0f, 14f, 
+			9f, 14f, 
+			9f,  0f 
+		};
+         */
+        /*
+		float[] tableVerticesWithTriangles = {
+			// Triangle 1
+			0f,  0f, 
 			9f, 14f,
 			0f, 14f,
-			
+
 			// Triangle 2
-			0f, 0f,
-			9f, 0f,
+			0f,  0f, 
+			9f,  0f,							
+			9f, 14f			
+			// Next block for formatting purposes
 			9f, 14f,
-			
-			//Line 1
-			0f, 7f,
-			9f, 7f,
-			
-			//Mallets
-			4.5f, 2f,
+			, // Comma here for formatting purposes			
+
+			// Line 1
+			0f,  7f, 
+			9f,  7f,
+
+			// Mallets
+			4.5f,  2f, 
 			4.5f, 12f
 		};
-	private Context mContext;
+         */
+        float[] tableVerticesWithTriangles = {
+            // Triangle 1
+            -0.5f, -0.5f, 
+             0.5f,  0.5f,
+            -0.5f,  0.5f,
 
-	public AirHockeyRenderer(Context context) {
-		this.mContext = context;
-		vertexData = ByteBuffer.allocateDirect(tableVerticesWithTriangles.length * BYTES_PER_FLOAT).order(ByteOrder.nativeOrder())
-				.asFloatBuffer();
-		vertexData.put(tableVerticesWithTriangles);
-	}
+            // Triangle 2
+            -0.5f, -0.5f, 
+             0.5f, -0.5f, 
+             0.5f,  0.5f,
 
-	@Override
-	public void onSurfaceCreated(GL10 gl, EGLConfig config) {
+            // Line 1
+            -0.5f, 0f, 
+             0.5f, 0f,
+
+            // Mallets
+            0f, -0.25f, 
+            0f,  0.25f
+        };
+        
+        vertexData = ByteBuffer
+            .allocateDirect(tableVerticesWithTriangles.length * BYTES_PER_FLOAT)
+            .order(ByteOrder.nativeOrder())
+            .asFloatBuffer();
+
+        vertexData.put(tableVerticesWithTriangles);
+    }
+
+
+    @Override
+    public void onSurfaceCreated(GL10 glUnused, EGLConfig config) {
+        /*
+		// Set the background clear color to red. The first component is red,
+		// the second is green, the third is blue, and the last component is
+		// alpha, which we don't use in this lesson.
 		glClearColor(1.0f, 0.0f, 0.0f, 0.0f);
-		
-		String vertexShaderSource = TextResourceReader.readTextFileFromResource(mContext, R.raw.simple_vertex_shader);
-		String fragmentShaderSource = TextResourceReader.readTextFileFromResource(mContext, R.raw.simple_fragment_shader);
-		
-		int vertexShader = ShaderHelper.compileVertexShader(vertexShaderSource);
-		int fragmentShader = ShaderHelper.compileFragmentShader(fragmentShaderSource);
-		
-		program = ShaderHelper.linkProgram(vertexShader, fragmentShader);
-		
-		ShaderHelper.validateProgram(program);
-		
-		glUseProgram(program);
-		
-		//getting the locations of the attribute and the uniform
-		uColorLocation = glGetUniformLocation(program, U_COLOR);
-		aPositionLocation = glGetAttribLocation(program, A_POSITION);
-		
-		// poiting OpenGL toward the data that should be associated with the position location
-		vertexData.position(0);
-		glVertexAttribPointer(aPositionLocation, POSITION_COMPONENT_COUNT, GL_FLOAT, false, 0, vertexData);
-		
-		//telling OpenGL where to find the info it needs
-		glEnableVertexAttribArray(aPositionLocation);
-	}
+         */
 
-	@Override
-	public void onDrawFrame(GL10 gl) {
-		glClear(GL_COLOR_BUFFER_BIT);
-		
-		//update the value of u_Color in our shader
-		glUniform4f(uColorLocation, 1.0f, 1.0f, 1.0f, 1.0f);
-		//draw triangle
-	    glDrawArrays(GL_TRIANGLES, 0, 6);
-	    
-	  //update the value of u_Color in our shader
-	    glUniform4f(uColorLocation, 1.0f, 0.0f, 0.0f, 1.0f);
-	    //draw the deviding line
-	    glDrawArrays(GL_LINES, 6, 2);
-	    
-	 // Draw the first mallet blue.
-	    glUniform4f(uColorLocation, 0.0f, 0.0f, 1.0f, 1.0f);
-	    glDrawArrays(GL_POINTS, 8, 1);
-	    // Draw the second mallet red.
-	    glUniform4f(uColorLocation, 1.0f, 0.0f, 0.0f, 1.0f);
-	    glDrawArrays(GL_POINTS, 9, 1);
-	}
+        glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 
-	@Override
-	public void onSurfaceChanged(GL10 gl, int width, int height) {
-		// Set the OpenGL viewport to fill the entire surface.
-	    glViewport(0, 0, width, height);
+        String vertexShaderSource = TextResourceReader.readTextFileFromResource(context, R.raw.simple_vertex_shader);
+        String fragmentShaderSource = TextResourceReader.readTextFileFromResource(context, R.raw.simple_fragment_shader);
 
-	}
+        int vertexShader = ShaderHelper.compileVertexShader(vertexShaderSource);
+        int fragmentShader = ShaderHelper.compileFragmentShader(fragmentShaderSource);
+
+        program = ShaderHelper.linkProgram(vertexShader, fragmentShader);
+
+
+        ShaderHelper.validateProgram(program);
+
+
+        glUseProgram(program);
+
+        uColorLocation = glGetUniformLocation(program, U_COLOR);
+        
+        aPositionLocation = glGetAttribLocation(program, A_POSITION);
+        
+        // Bind our data, specified by the variable vertexData, to the vertex
+        // attribute at location A_POSITION_LOCATION.
+        vertexData.position(0);
+        glVertexAttribPointer(aPositionLocation, POSITION_COMPONENT_COUNT, GL_FLOAT, 
+            false, 0, vertexData);
+
+        glEnableVertexAttribArray(aPositionLocation);
+    }
+
+    /**
+     * onSurfaceChanged is called whenever the surface has changed. This is
+     * called at least once when the surface is initialized. Keep in mind that
+     * Android normally restarts an Activity on rotation, and in that case, the
+     * renderer will be destroyed and a new one created.
+     * 
+     * @param width
+     *            The new width, in pixels.
+     * @param height
+     *            The new height, in pixels.
+     */
+    @Override
+    public void onSurfaceChanged(GL10 glUnused, int width, int height) {
+        // Set the OpenGL viewport to fill the entire surface.
+        glViewport(0, 0, width, height);		
+    }
+
+    /**
+     * OnDrawFrame is called whenever a new frame needs to be drawn. Normally,
+     * this is done at the refresh rate of the screen.
+     */
+    @Override
+    public void onDrawFrame(GL10 glUnused) {
+        // Clear the rendering surface.
+        glClear(GL_COLOR_BUFFER_BIT);
+        
+        // Draw the table.
+        glUniform4f(uColorLocation, 1.0f, 1.0f, 1.0f, 1.0f);		
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        
+        // Draw the center dividing line.
+        glUniform4f(uColorLocation, 1.0f, 0.0f, 0.0f, 1.0f);		
+        glDrawArrays(GL_LINES, 6, 2); 
+        
+        // Draw the first mallet blue.        
+        glUniform4f(uColorLocation, 0.0f, 0.0f, 1.0f, 1.0f);		
+        glDrawArrays(GL_POINTS, 8, 1);
+
+        // Draw the second mallet red.
+        glUniform4f(uColorLocation, 1.0f, 0.0f, 0.0f, 1.0f);		
+        glDrawArrays(GL_POINTS, 9, 1);
+    }
 }
